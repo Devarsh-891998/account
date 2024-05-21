@@ -1,5 +1,6 @@
 package com.cafe.account.serviceimpl;
 
+import com.cafe.account.JWT.JWTUtils;
 import com.cafe.account.constants.CafeConstants;
 import com.cafe.account.dao.UserDao;
 import com.cafe.account.service.UserService;
@@ -14,6 +15,11 @@ import com.cafe.account.POJO.User;
 import java.util.Map;
 import java.util.Objects;
 
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+
+
 @Slf4j
 @Service
 public class UserServiceImpl implements UserService {
@@ -21,6 +27,11 @@ public class UserServiceImpl implements UserService {
     @Autowired
     UserDao userDao;
 
+    @Autowired
+    AuthenticationManager authenticationManager;
+
+    @Autowired
+    JWTUtils jwtUtils;
     @Override
     public ResponseEntity<String> signup(Map<String, String> requestMap){
         log.info("Inside signup : {}",requestMap);
@@ -59,4 +70,25 @@ public class UserServiceImpl implements UserService {
         user.setRole("user");
         return user;
     }
+
+    @Override
+    public ResponseEntity<String> login(Map<String, String> requestMap) {
+        log.info("Inside Login");
+        try {
+            Authentication auth = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(requestMap.get("email"), requestMap.get("password")));
+            if (auth.isAuthenticated()) {
+                User user = userDao.findByEmailId(requestMap.get("email"));
+                if (user.getStatus().equalsIgnoreCase("true")) {
+                    return new ResponseEntity<String>("{\"token\":\"" + jwtUtils.generateToken(user.getEmail(), user.getRole()) + "\"}", HttpStatus.OK);
+                } else {
+                    return new ResponseEntity<String>("{\"message\":\"Wait For Admin Approval\"}", HttpStatus.BAD_REQUEST);
+                }
+            }
+        } catch (Exception e) {
+            log.error("{}", e);
+        }
+        return new ResponseEntity<String>("{\"message\":\"" + CafeConstants.SOMETHING_WENT_WRONG + "\"}", HttpStatus.BAD_REQUEST);
+    }
+
 }
