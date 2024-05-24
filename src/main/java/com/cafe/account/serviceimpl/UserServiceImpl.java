@@ -1,10 +1,12 @@
 package com.cafe.account.serviceimpl;
 
 import com.cafe.account.JWT.JWTUtils;
+import com.cafe.account.JWT.JwtFilter;
 import com.cafe.account.constants.CafeConstants;
 import com.cafe.account.dao.UserDao;
 import com.cafe.account.service.UserService;
 import com.cafe.account.utils.CafeUtils;
+import com.cafe.account.wrapper.UserWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -12,8 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import com.cafe.account.POJO.User;
 
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -32,6 +33,9 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     JWTUtils jwtUtils;
+
+    @Autowired
+    JwtFilter jwtFilter;
     @Override
     public ResponseEntity<String> signup(Map<String, String> requestMap){
         log.info("Inside signup : {}",requestMap);
@@ -90,5 +94,48 @@ public class UserServiceImpl implements UserService {
         }
         return new ResponseEntity<String>("{\"message\":\"" + CafeConstants.SOMETHING_WENT_WRONG + "\"}", HttpStatus.BAD_REQUEST);
     }
+
+    @Override
+    public ResponseEntity<List<UserWrapper>> getAllUser() {
+        try{
+            if(jwtFilter.isAdmin()){
+                return new ResponseEntity<>(userDao.getAllUser(),HttpStatus.OK);
+            }
+            else{
+                return new ResponseEntity<>(new ArrayList<>(),HttpStatus.UNAUTHORIZED);
+            }
+        }
+        catch(Exception e){
+            e.printStackTrace();
+        }
+        return new ResponseEntity<>(new ArrayList<>(),HttpStatus.INTERNAL_SERVER_ERROR);
+
+    }
+
+
+    @Override
+    public ResponseEntity<String> updateStatus(Map<String, String> requestMap) {
+        try{
+            if(jwtFilter.isAdmin()){
+                Optional<User> optional = userDao.findById(Integer.parseInt(requestMap.get("id")));
+                if(optional.isEmpty()){
+                    return CafeUtils.getResponseEntity("User ID does not exist",HttpStatus.OK);
+                }
+                else{
+                    userDao.updateStatus(requestMap.get("status"),optional.get().getId());
+                    return CafeUtils.getResponseEntity("User status updated succesfully",HttpStatus.OK);
+                }
+            }
+            else{
+                return CafeUtils.getResponseEntity(CafeConstants.UNAUTHORIZED_ACCESS,HttpStatus.UNAUTHORIZED);
+            }
+        }
+        catch (Exception ex){
+            ex.printStackTrace();
+        }
+        return CafeUtils.getResponseEntity(CafeConstants.SOMETHING_WENT_WRONG,HttpStatus.INTERNAL_SERVER_ERROR);
+
+    }
+
 
 }
